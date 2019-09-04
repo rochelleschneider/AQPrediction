@@ -1,23 +1,28 @@
+---
+output: github_document
+---
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
 
 # AQPrediction
 
 <!-- badges: start -->
-
 <!-- badges: end -->
 
-The goal of this repo is to demonstrate spatio-temporal prediction
-models to estimate levels of air pollution.
+The goal of this repo is to demonstrate spatio-temporal prediction models to estimate levels of air pollution.
 
-The input dataset is an Excel
-[file](https://drive.google.com/open?id=14GvlMCBLR9FQ_BsCeg0tj-pb1AadXr3G3gKPnrfm8gg)
-provided as part of the [OpenGeoHub Summer
-School 2019](https://opengeohub.org/summer_school_2019).
+The input dataset is an Excel [file](https://drive.google.com/open?id=14GvlMCBLR9FQ_BsCeg0tj-pb1AadXr3G3gKPnrfm8gg) provided as part of the [OpenGeoHub Summer School 2019](https://opengeohub.org/summer_school_2019).
 
-We’ll use these packages
+We'll use these packages
 
-``` r
+```{r}
 suppressPackageStartupMessages({
   library(dplyr)
   library(sf)
@@ -26,10 +31,12 @@ suppressPackageStartupMessages({
 
 And read-in the input data as follows
 
-``` r
+```{r, warning=FALSE, message=FALSE}
 train = readxl::read_excel("SpatialPrediction.xlsx", sheet = 1)
 covar = readxl::read_excel("SpatialPrediction.xlsx", sheet = 2)
 locat = readxl::read_excel("SpatialPrediction.xlsx", sheet = 3)
 # times = readxl::read_excel("SpatialPrediction.xlsx", sheet = 4) # what is this?
 targt = readxl::read_excel("SpatialPrediction.xlsx", sheet = 5)
 ```
+
+
