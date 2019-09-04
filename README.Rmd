@@ -39,4 +39,31 @@ locat = readxl::read_excel("SpatialPrediction.xlsx", sheet = 3)
 targt = readxl::read_excel("SpatialPrediction.xlsx", sheet = 5)
 ```
 
+The objective is to fill the NA values in the `targt` data:
+
+```{r}
+targt[1:3]
+```
+
+
+Let's do some data cleaning and plot the data:
+
+```{r}
+d = inner_join(train, covar)
+d = inner_join(d, locat)
+dsf = sf::st_as_sf(d, coords = c("X", "Y"), crs = 4326)
+summary(dsf)
+mapview::mapview(dsf %>% sample_n(1000))
+```
+
+A simple model:
+
+```{r}
+m = lm(PM10 ~ humidity + temperature, data = d)
+p = predict(object = m, newdata = d)
+plot(d$PM10, p)
+cor(d$PM10, p)^2
+```
+
+A simple linear model can explain ~3% of the variability in PM10 levels, not great!
 
