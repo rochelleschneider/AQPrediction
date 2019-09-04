@@ -26,6 +26,9 @@ We'll use these packages
 suppressPackageStartupMessages({
   library(dplyr)
   library(sf)
+  library(ranger)
+  library (CAST)
+  library(caret)
 })
 ```
 
@@ -35,8 +38,17 @@ And read-in the input data as follows
 train = readxl::read_excel("SpatialPrediction.xlsx", sheet = 1)
 covar = readxl::read_excel("SpatialPrediction.xlsx", sheet = 2)
 locat = readxl::read_excel("SpatialPrediction.xlsx", sheet = 3)
-# times = readxl::read_excel("SpatialPrediction.xlsx", sheet = 4) # what is this?
+# times = readxl::read_excel("SpatialPrediction.xlsx", sheet = 4) # what is this? -->Their test set. They will use to check our model
 targt = readxl::read_excel("SpatialPrediction.xlsx", sheet = 5)
+
+data <- merge(train, covar, all.by="id")
+data <- merge(data, locat, all.by="id")
+class(data$time)
+data$dow <- weekdays.POSIXt(data$time)
+data$hour <-  ??? (data$time) # do you remember how to extract the hour??
+head(d)
+nrow(data)
+
 ```
 
 The objective is to fill the NA values in the `targt` data:
@@ -44,7 +56,6 @@ The objective is to fill the NA values in the `targt` data:
 ```{r}
 targt[1:3]
 ```
-
 
 Let's do some data cleaning and plot the data:
 
@@ -56,13 +67,98 @@ summary(dsf)
 mapview::mapview(dsf %>% sample_n(1000))
 ```
 
-A simple model:
+Lat and long are also predictors, but work as an interaction X*Y
+We can check if day of the week, just day or hour are valuable predictors, but working as.factor(day) in the regression.
+
+Lets try a fancy model. Random Forest
 
 ```{r}
+################
+## FORMULA ##
+formula <- as.formula(PM10 ~ humidity + temperature + (X*Y))
+
+#####################
+##\\RANDOM FOREST//##
+#####################
+tunegrid <- expand.grid(.mtry=c(3), .splitrule = "variance", .min.node.size = c(5))
+#@ mtry = 3 (Number of variables to possibly split at in each node. Default is the (rounded down) square root of the number variables).
+#@ min.node.size = 5  (Minimal node size. Default 1 for classification, 5 for regression, 3 for survival, and 10 for probability).
+#@ splitrule = variance (Splitting rule. For regression "variance", "extratrees" or "maxstat" with default "variance").
+
+#RANDOM CV
+ranger.model <- caret::train (formula, 
+                                data= data, 
+                                method="ranger", 
+                                metric="RMSE",
+                                num.trees = 50,
+                                tuneGrid=tunegrid, 
+                                trControl=trainControl(method="cv", number=10, 
+                                                      allowParallel=TRUE, verboseIter=TRUE))  
+ranger.model
+
+#SPACE CV
+space.cv <- CreateSpacetimeFolds(data, spacevar = "id")
+  
+ranger.space <- caret::train (formula, 
+                                data= data, 
+                                method="ranger", 
+                                metric="RMSE",
+                                num.trees = 50,
+                                tuneGrid=tunegrid,
+                                trControl=trainControl(method="cv", index = space.cv$index,
+                                                      number=10, allowParallel = TRUE))
+ranger.space 
+space.df <- data
+space.df$pred <- predict(ranger.space, space.df)
+lm.space <- lm(PM10 ~ pred, data=space.df)
+summary(lm.space)
+
+#\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+#TIME CV
+time.cv <- CreateSpacetimeFolds(data, spacevar = "time")
+  
+ranger.time <- caret::train (formula, 
+                                data= data, 
+                                method="ranger", 
+                                metric="RMSE",
+                                num.trees = 50,
+                                tuneGrid=tunegrid,
+                                trControl=trainControl(method="cv", index = time.cv$index,
+                                                      number=10, allowParallel = TRUE))
+                                                      
+ranger.time
+time.df <- data
+time.df$pred <- predict(ranger.time, time.df)
+lm.time <- lm(PM10 ~ pred, data=time.df)
+summary(lm.time)
+
+#\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+#SPACE-TIME CV
+spacetime.cv <- CreateSpacetimeFolds(data, spacevar = "id",timevar ="time")
+  
+ranger.spacetime <- caret::train (formula, 
+                                data= data, 
+                                method="ranger", 
+                                metric="RMSE",
+                                num.trees = 50,
+                                tuneGrid=tunegrid,
+                                trControl=trainControl(method="cv", index = spacetime.cv$index,
+                                                      number=10, allowParallel = TRUE))
+                                                      
+ranger.spacetime
+spacetime.df <- data
+spacetime.df$pred <- predict(ranger.spacetime, spacetime.df)
+lm.spacetime <- lm(PM10 ~ pred, data=spacetime)
+summary(lm.spacetime)
+```
+A simple model:
+```{r}
+##\\LINEAR//##
 m = lm(PM10 ~ humidity + temperature, data = d)
 p = predict(object = m, newdata = d)
 plot(d$PM10, p)
 cor(d$PM10, p)^2
+################
 ```
 
 A simple linear model can explain ~3% of the variability in PM10 levels, not great!
